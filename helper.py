@@ -1,3 +1,5 @@
+from PyQt5.QtWidgets import QFileDialog
+
 def from_text(f_name):
     with open(f_name, encoding='utf-8') as f:
         raw_data = f.readlines()
@@ -11,6 +13,11 @@ def from_text(f_name):
         data.append([l] + [s.split(' ') for s in raw_data[i:i + l]])
         i += l
     return data
+
+def select_file(self):
+    file_name, _ = QFileDialog.getOpenFileName(self)
+    return file_name
+
 
 if __name__ == '__main__':
     f_name = 'input/data.in'
