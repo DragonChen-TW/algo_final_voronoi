@@ -1,6 +1,8 @@
 import sys, json
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
+#
+import helper
 
 class Canvas(QtWidgets.QLabel):
     def __init__(self):
@@ -12,7 +14,7 @@ class Canvas(QtWidgets.QLabel):
         self.setPixmap(pixmap)
         self.painter = QtGui.QPainter(self.pixmap())
         p = self.painter.pen()
-        p.setWidth(10)
+        p.setWidth(7)
         p.setColor(Qt.black)
         self.painter.setPen(p)
 
@@ -25,9 +27,7 @@ class Canvas(QtWidgets.QLabel):
 
     def mousePressEvent(self, e):
         if self.mode == 1 and len(self.data) < self.max_points:
-            self.painter.drawPoint(e.x(), e.y())
-            self.update()
-
+            self.draw_point(e.x(), e.y())
             self.data.append((e.x(), e.y()))
 
     def draw_line(self, x1, y1, x2, y2):
@@ -40,14 +40,23 @@ class Canvas(QtWidgets.QLabel):
         self.painter.drawLine(x1, y1, x2, y2)
         self.update()
 
+    def draw_point(self, x, y):
+        self.painter.drawPoint(x, y)
+        self.update()
+
+    def draw_edge(self, x1, y1, x2, y2):
+        self.painter.drawLine(x1, y1, x2, y2)
+
     def draw_edges(self, edges):
         p = self.painter.pen()
         p.setWidth(2)
         p.setColor(Qt.red)
         self.painter.setPen(p)
         for edge in edges:
-            # self.painter.drawPoint(edge[0], edge[1])
-            self.painter.drawLine(*edge[0], *edge[1])
+            if len(edge) == 2:
+                self.draw_edge(*edge[0], *edge[1])
+            else:
+                self.draw_edge(*edge)
 
         # back
         p.setWidth(10)
@@ -56,7 +65,7 @@ class Canvas(QtWidgets.QLabel):
 
         self.update()
 
-class CanvasApp(QtWidgets.QWidget):
+class App(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self._initUI()
@@ -68,6 +77,13 @@ class CanvasApp(QtWidgets.QWidget):
 
 
         # btns
+        load = QtWidgets.QPushButton()
+        load.setText('Load')
+        load.clicked.connect(self.load)
+        load_result = QtWidgets.QPushButton()
+        load_result.setText('Load Result')
+        load_result.clicked.connect(self.load_result)
+
         run = QtWidgets.QPushButton()
         run.setText('Run')
         run.clicked.connect(self.run)
@@ -79,6 +95,8 @@ class CanvasApp(QtWidgets.QWidget):
         clear.clicked.connect(self.clear)
 
         btns = QtWidgets.QHBoxLayout()
+        btns.addWidget(load)
+        btns.addWidget(load_result)
         btns.addWidget(run)
         btns.addWidget(save)
         btns.addWidget(clear)
@@ -88,6 +106,22 @@ class CanvasApp(QtWidgets.QWidget):
         layout.addWidget(self.canvas)
         layout.addLayout(btns)
         self.setLayout(layout)
+
+    def load_result(self):
+        self.clear()
+        f_name = helper.select_file(self)
+        p_data, e_data = helper.from_result(f_name)
+
+        for p in p_data:
+            self.canvas.draw_point(*p)
+        # for e in e_data:
+        #     self.canvas.draw_edge(*e)
+        self.canvas.draw_edges(e_data)
+
+    def load(self):
+        f_name = helper.select_file(self)
+        data = helper.from_text(f_name)
+        print(len(data))
 
     def run(self):
         data = sorted(self.canvas.data, key=lambda x: (x[0], x[1]))
@@ -154,6 +188,6 @@ def voronoi(points):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-    canvas_app = CanvasApp()
+    canvas_app = App()
     canvas_app.show()
     app.exec_()

@@ -14,6 +14,19 @@ def from_text(f_name):
         i += l
     return data
 
+def from_result(f_name):
+    with open(f_name, encoding='utf-8') as f:
+        raw_data = f.readlines()
+        raw_data = [l[:-1] for l in raw_data
+                    if l[0] not in ('#', '\n')]
+
+    point_data = [(int(l.split(' ')[1]), int(l.split(' ')[2]))
+                    for l in raw_data if l[0] == 'P']
+    edge_data = [[int(s) for s in l.split(' ')[1:]]
+                    for l in raw_data if l[0] == 'E']
+
+    return point_data, edge_data
+
 def select_file(self):
     file_name, _ = QFileDialog.getOpenFileName(self)
     return file_name
