@@ -73,6 +73,7 @@ class App(QtWidgets.QWidget):
         self.setWindowTitle('Algorithm final - Voronoi')
 
         self.data = []
+        self.data_i = 0
 
     def _initUI(self):
         self.canvas = Canvas()
@@ -134,7 +135,7 @@ class App(QtWidgets.QWidget):
                 self.draw_data()
 
     def previous_data(self):
-        if self.data_i > 1:
+        if self.data_i > 0:
             self.data_i -= 1
             self.data_input.setText(str(self.data_i))
             self.draw_data()
@@ -166,7 +167,7 @@ class App(QtWidgets.QWidget):
         self.draw_data()
 
     def draw_data(self):
-        print(self.data[self.data_i])
+        (self.data[self.data_i])
         self.clear()
         for p in self.data[self.data_i][1:]:
             self.canvas.draw_point(*p)
@@ -177,6 +178,7 @@ class App(QtWidgets.QWidget):
         data = sorted(self.canvas.data, key=lambda x: (x[0], x[1]))
         self.canvas.data = data
         edges = self.voronoi_temp(data)
+        self.edges = edges
 
         # print(len(edges), 'edges')
         print('edges', edges)
@@ -185,8 +187,13 @@ class App(QtWidgets.QWidget):
 
     def save(self):
         self.canvas.pixmap().save('output/plot.png', 'png')
-        with open('output/dots.json', 'w') as f:
-            json.dump(self.canvas.data, f)
+        data = ''
+        data += '\n'.join(['P {} {}'.format(d[0], d[1]) for d in self.canvas.data]) + '\n'
+        print(self.edges)
+        data += '\n'.join(['E {} {} {} {}'.format(int(d[0][0]), int(d[0][1]), int(d[1][0]), int(d[1][1])) for d in self.edges]) + '\n'
+
+        with open('output/dots.out', 'w') as f:
+            f.write(data)
 
     def clear(self):
         self.canvas.pixmap().fill(Qt.white)
@@ -250,7 +257,7 @@ class App(QtWidgets.QWidget):
                     longest = max([f[3] for f in funcs])
                     longest_i = [f[3] for f in funcs].index(longest)
                     directions[longest_i] = 'in'
-                print(directions)
+                # print(directions)
 
                 dots = [points[2], points[0], points[1]]
                 edges = [get_edge_temp(f[0], f[1], mid, f[2], dots[i], directions[i]) for i, f in enumerate(funcs)]
@@ -278,9 +285,6 @@ def get_func(p1, p2):
     calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
     edge_len = calc_len(p1, p2)
 
-    print(p1, p2)
-    print('funcs', a, b)
-
     return a, b, l_mid, edge_len
 
 def get_edge(p1, p2, a=None, b=None):
@@ -289,7 +293,6 @@ def get_edge(p1, p2, a=None, b=None):
     res = get_func(p1, p2)
     a = res[0]
     b = res[1]
-    print('ab', a, b)
 
     # get points on edge
     edges = []
@@ -330,8 +333,6 @@ def get_edge_temp(a, b, mid, l_mid, dot, direction):
     l_flag = b                  # x = 0
     r_flag = 600 * a + b        # x = 600
 
-    print('flags', t_flag, b_flag, l_flag, r_flag)
-
     if 0 <= t_flag and t_flag <= 600:
         edges.append((t_flag, 0))
     if 0 <= b_flag and b_flag <= 600:
@@ -341,12 +342,10 @@ def get_edge_temp(a, b, mid, l_mid, dot, direction):
     if len(edges) < 2 and 0 < r_flag and r_flag < 600:
         edges.append((600, r_flag))
 
-    print(edges)
+    print(a, b)
 
     calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
     if calc_len(edges[0], l_mid) == calc_len(edges[0], mid): # 直角
-        print('直')
-        print(a, b, dot)
         if calc_len(edges[0], dot) > calc_len(edges[0], mid):
             out_i = 0
             in_i = 1

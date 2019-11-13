@@ -1,3 +1,4 @@
 output/*.json
+output/*.out
 output/*.png
 Pipfile.lock
