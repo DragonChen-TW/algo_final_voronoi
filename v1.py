@@ -1,4 +1,4 @@
-import sys, json
+import sys, json, os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 #
@@ -167,7 +167,6 @@ class App(QtWidgets.QWidget):
         self.draw_data()
 
     def draw_data(self):
-        (self.data[self.data_i])
         self.clear()
         for p in self.data[self.data_i][1:]:
             self.canvas.draw_point(*p)
@@ -175,6 +174,11 @@ class App(QtWidgets.QWidget):
         self.run()
 
     def run(self):
+        self.canvas.pixmap().fill(Qt.white)
+        for d in self.canvas.data:
+            self.canvas.draw_point(d[0], d[1])
+        self.canvas.update()
+
         data = sorted(self.canvas.data, key=lambda x: (x[0], x[1]))
         self.canvas.data = data
         edges = self.voronoi_temp(data)
@@ -191,6 +195,8 @@ class App(QtWidgets.QWidget):
         data += '\n'.join(['P {} {}'.format(d[0], d[1]) for d in self.canvas.data]) + '\n'
         print(self.edges)
         data += '\n'.join(['E {} {} {} {}'.format(int(d[0][0]), int(d[0][1]), int(d[1][0]), int(d[1][1])) for d in self.edges]) + '\n'
+
+        os.makedirs('output', exist_ok=True)
 
         with open('output/dots.out', 'w') as f:
             f.write(data)
