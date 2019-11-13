@@ -20,7 +20,7 @@ class Canvas(QtWidgets.QLabel):
 
         # data and variable
         self.mode = 1 # can only draw point
-        self.max_points = 10
+        self.max_points = 3
         self.data = []
 
         # self.draw_line(100, 200, 400.5, 600)
@@ -125,10 +125,10 @@ class App(QtWidgets.QWidget):
 
     def run(self):
         data = sorted(self.canvas.data, key=lambda x: (x[0], x[1]))
-        edges = voronoi(data)
+        edges = self.voronoi_temp(data)
 
-        print(len(edges), 'edges')
-        print('edges', edges)
+        # print(len(edges), 'edges')
+        # print('edges', edges)
 
         self.canvas.draw_edges(edges)
 
@@ -142,14 +142,79 @@ class App(QtWidgets.QWidget):
         self.canvas.update()
         self.canvas.data = []
 
-def get_edge(p1, p2):
-    # get ax + b
-    print(p1, p2)
+
+    def voronoi(self, points):
+        if len(points) == 1:
+            return []
+
+        l = len(points) // 2
+        l_points = points[:l]
+        r_points = points[l:]
+        l_lines = self.voronoi(l_points)
+        r_lines = self.voronoi(r_points)
+
+        # merge
+        edges = [get_edge(l_points[-1], r_points[0])]
+        lines = l_lines + r_lines + edges
+
+        return lines
+
+    def voronoi_temp(self, points):
+        if len(points) == 1:
+            return []
+        elif len(points) == 2:
+            return [get_edge(points[0], points[1])]
+        elif len(points) == 3:
+            funcs = [
+                get_func(points[0], points[1]),
+                get_func(points[1], points[2]),
+                get_func(points[0], points[2])
+            ]
+
+            edge_lens = [f[3] for f in funcs]
+            lens = sorted(edge_lens)
+            ctr = lens[0] ** 2 + lens[1] ** 2 > lens[2] ** 2
+            # true is sharp, false is right/obtuse
+
+            # calc mid
+            mid_x = (funcs[1][1] - funcs[0][1]) / (funcs[0][0] - funcs[1][0])
+            mid_y = mid_x * funcs[0][0] + funcs[0][1]
+            mid = (mid_x, mid_y)
+
+            calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
+            directions = ['out', 'out', 'out']
+            if not ctr: # if not sharp
+                longest = max([f[3] for f in funcs])
+                longest_i = [f[3] for f in funcs].index(longest)
+                directions[longest_i] = 'in'
+
+            dots = [points[2], points[0], points[1]]
+            edges = [get_edge_temp(f[0], f[1], mid, f[2], directions[i]) for i, f in enumerate(funcs)]
+
+            return edges
+        else:
+            # Not implemented
+            return []
+
+def get_func(p1, p2):
     calc_mid = lambda p1, p2: ((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)
-    calc_slope = lambda p1, p2: (p2[1] - p1[1]) / (p2[0] - p1[0])
+    calc_slope = lambda p1, p2: (p2[1] - p1[1]) / (p2[0] - p1[0] + 0.0001)
     x, y = calc_mid(p1, p2)
+    l_mid = (x, y)
     a = -1 / calc_slope(p1, p2)
     b = y - a * x
+
+    calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
+    edge_len = calc_len(p1, p2)
+
+    return a, b, l_mid, edge_len
+
+def get_edge(p1, p2, a=None, b=None):
+    # get ax + b
+    print(p1, p2)
+    res = get_func(p1, p2)
+    a = res[0]
+    b = res[1]
 
     # get points on edge
     edges = []
@@ -169,22 +234,36 @@ def get_edge(p1, p2):
 
     return edges
 
-def voronoi(points):
-    if len(points) == 1:
-        return []
+def get_edge_temp(a, b, mid, l_mid, direction):
+    edges = []
+    t_flag = -b // a            # y = 0
+    b_flag = (600 - b) // a     # y = 600
+    l_flag = b                  # x = 0
+    r_flag = 600 * a + b        # x = 600
 
-    l = len(points) // 2
-    l_points = points[:l]
-    r_points = points[l:]
-    l_lines = voronoi(l_points)
-    r_lines = voronoi(r_points)
+    if 0 <= t_flag and t_flag <= 600:
+        edges.append((t_flag, 0))
+    if 0 < b_flag and b_flag < 600:
+        edges.append((b_flag, 600))
+    if 0 <= l_flag and l_flag <= 600:
+        edges.append((0, l_flag))
+    if 0 < r_flag and r_flag < 600:
+        edges.append((600, r_flag))
 
-    # merge
-    edges = [get_edge(l_points[-1], r_points[0])]
-    lines = l_lines + r_lines + edges
+    calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
+    if calc_len(edges[0], l_mid) >= calc_len(edges[0], mid):
+        out_i = 0
+        in_i = 1
+    else:
+        out_i = 1
+        in_i = 0
 
-    return lines
+    if direction == 'out':
+        edges[out_i] = mid
+    else:
+        edges[in_i] = mid
 
+    return edges
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
