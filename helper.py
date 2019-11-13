@@ -10,7 +10,7 @@ def from_text(f_name):
     while i < len(raw_data) and raw_data[i] != '0':
         l = int(raw_data[i])
         i += 1
-        data.append([l] + [s.split(' ') for s in raw_data[i:i + l]])
+        data.append([l] + [[int(s_str) for s_str in s.split(' ')] for s in raw_data[i:i + l]])
         i += l
     return data
 

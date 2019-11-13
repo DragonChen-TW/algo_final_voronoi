@@ -20,7 +20,7 @@ class Canvas(QtWidgets.QLabel):
 
         # data and variable
         self.mode = 1 # can only draw point
-        self.max_points = 3
+        self.max_points = 10
         self.data = []
 
         # self.draw_line(100, 200, 400.5, 600)
@@ -72,6 +72,8 @@ class App(QtWidgets.QWidget):
         self.setGeometry(750, 150, 600, 600)
         self.setWindowTitle('Algorithm final - Voronoi')
 
+        self.data = []
+
     def _initUI(self):
         self.canvas = Canvas()
 
@@ -83,6 +85,16 @@ class App(QtWidgets.QWidget):
         load_result = QtWidgets.QPushButton()
         load_result.setText('Load Result')
         load_result.clicked.connect(self.load_result)
+        data_input = QtWidgets.QLineEdit(self)
+        data_input.setFixedWidth(80)
+        data_input.textChanged.connect(self.data_input_change)
+        self.data_input = data_input
+        previous_data = QtWidgets.QPushButton()
+        previous_data.setText('Next Data')
+        previous_data.clicked.connect(self.previous_data)
+        next_data = QtWidgets.QPushButton()
+        next_data.setText('Next Data')
+        next_data.clicked.connect(self.next_data)
 
         run = QtWidgets.QPushButton()
         run.setText('Run')
@@ -97,15 +109,41 @@ class App(QtWidgets.QWidget):
         btns = QtWidgets.QHBoxLayout()
         btns.addWidget(load)
         btns.addWidget(load_result)
-        btns.addWidget(run)
-        btns.addWidget(save)
-        btns.addWidget(clear)
+        btns.addWidget(data_input)
+        btns.addWidget(previous_data)
+        btns.addWidget(next_data)
+
+        btns2 = QtWidgets.QHBoxLayout()
+        btns2.addWidget(run)
+        btns2.addWidget(save)
+        btns2.addWidget(clear)
 
         # VBox Layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.canvas)
         layout.addLayout(btns)
+        layout.addLayout(btns2)
         self.setLayout(layout)
+
+    def data_input_change(self):
+        text = self.data_input.text()
+        if text:
+            data_i = int(text)
+            if data_i >= 0 and data_i < len(self.data):
+                self.data_i = data_i
+                self.draw_data()
+
+    def previous_data(self):
+        if self.data_i > 1:
+            self.data_i -= 1
+            self.data_input.setText(str(self.data_i))
+            self.draw_data()
+
+    def next_data(self):
+        if self.data_i < len(self.data) - 1:
+            self.data_i += 1
+            self.data_input.setText(str(self.data_i))
+            self.draw_data()
 
     def load_result(self):
         self.clear()
@@ -121,14 +159,27 @@ class App(QtWidgets.QWidget):
     def load(self):
         f_name = helper.select_file(self)
         data = helper.from_text(f_name)
-        print(len(data))
+        self.data = data
+        self.data_i = 0
+        self.data_input.setText(str(self.data_i))
+
+        self.draw_data()
+
+    def draw_data(self):
+        print(self.data[self.data_i])
+        self.clear()
+        for p in self.data[self.data_i][1:]:
+            self.canvas.draw_point(*p)
+            self.canvas.data.append(p)
+        self.run()
 
     def run(self):
         data = sorted(self.canvas.data, key=lambda x: (x[0], x[1]))
+        self.canvas.data = data
         edges = self.voronoi_temp(data)
 
         # print(len(edges), 'edges')
-        # print('edges', edges)
+        print('edges', edges)
 
         self.canvas.draw_edges(edges)
 
@@ -141,7 +192,6 @@ class App(QtWidgets.QWidget):
         self.canvas.pixmap().fill(Qt.white)
         self.canvas.update()
         self.canvas.data = []
-
 
     def voronoi(self, points):
         if len(points) == 1:
@@ -160,6 +210,16 @@ class App(QtWidgets.QWidget):
         return lines
 
     def voronoi_temp(self, points):
+        del_i = -1
+        for i, p1 in enumerate(points):
+            for j, p2 in enumerate(points):
+                if i == j:
+                    continue
+                if p1 == p2:
+                    del_i = i
+        if del_i != -1:
+            points.pop(del_i)
+
         if len(points) == 1:
             return []
         elif len(points) == 2:
@@ -177,19 +237,23 @@ class App(QtWidgets.QWidget):
             # true is sharp, false is right/obtuse
 
             # calc mid
-            mid_x = (funcs[1][1] - funcs[0][1]) / (funcs[0][0] - funcs[1][0])
-            mid_y = mid_x * funcs[0][0] + funcs[0][1]
-            mid = (mid_x, mid_y)
+            if funcs[0][0] == funcs[1][0]: # 平行
+                edges = [get_edge(points[0], points[1]), get_edge(points[1], points[2])]
+            else:
+                mid_x = (funcs[1][1] - funcs[0][1]) / (funcs[0][0] - funcs[1][0])
+                mid_y = mid_x * funcs[0][0] + funcs[0][1]
+                mid = (mid_x, mid_y)
 
-            calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
-            directions = ['out', 'out', 'out']
-            if not ctr: # if not sharp
-                longest = max([f[3] for f in funcs])
-                longest_i = [f[3] for f in funcs].index(longest)
-                directions[longest_i] = 'in'
+                calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
+                directions = ['out', 'out', 'out']
+                if not ctr: # if not sharp
+                    longest = max([f[3] for f in funcs])
+                    longest_i = [f[3] for f in funcs].index(longest)
+                    directions[longest_i] = 'in'
+                print(directions)
 
-            dots = [points[2], points[0], points[1]]
-            edges = [get_edge_temp(f[0], f[1], mid, f[2], directions[i]) for i, f in enumerate(funcs)]
+                dots = [points[2], points[0], points[1]]
+                edges = [get_edge_temp(f[0], f[1], mid, f[2], dots[i], directions[i]) for i, f in enumerate(funcs)]
 
             return edges
         else:
@@ -198,14 +262,24 @@ class App(QtWidgets.QWidget):
 
 def get_func(p1, p2):
     calc_mid = lambda p1, p2: ((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)
-    calc_slope = lambda p1, p2: (p2[1] - p1[1]) / (p2[0] - p1[0] + 0.0001)
+    calc_slope = lambda p1, p2: (p2[1] - p1[1]) / (p2[0] - p1[0])
     x, y = calc_mid(p1, p2)
     l_mid = (x, y)
-    a = -1 / calc_slope(p1, p2)
-    b = y - a * x
+    if p1[0] == p2[0]:
+        a = 0
+        b = y - a * x
+    elif p1[1] == p2[1]:
+        a = 1340
+        b = (p1[0] + p2[0]) / 2
+    else:
+        a = -1 / calc_slope(p1, p2)
+        b = y - a * x
 
     calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
     edge_len = calc_len(p1, p2)
+
+    print(p1, p2)
+    print('funcs', a, b)
 
     return a, b, l_mid, edge_len
 
@@ -215,43 +289,71 @@ def get_edge(p1, p2, a=None, b=None):
     res = get_func(p1, p2)
     a = res[0]
     b = res[1]
+    print('ab', a, b)
 
     # get points on edge
     edges = []
-    t_flag = -b // a            # y = 0
-    b_flag = (600 - b) // a     # y = 600
+    if a == 1340:
+        t_flag = b
+        b_flag = b
+    elif a != 0:
+        t_flag = -b // a            # y = 0
+        b_flag = (600 - b) // a     # y = 600
+    else:
+        t_flag = -1
+        b_flag = -1
     l_flag = b                  # x = 0
     r_flag = 600 * a + b        # x = 600
 
-    if 0 <= t_flag and t_flag <= 600:
+    if len(edges) < 2 and 0 <= t_flag and t_flag <= 600:
         edges.append((t_flag, 0))
-    if 0 < b_flag and b_flag < 600:
+    if len(edges) < 2 and 0 < b_flag and b_flag < 600:
         edges.append((b_flag, 600))
-    if 0 <= l_flag and l_flag <= 600:
+    if len(edges) < 2 and 0 <= l_flag and l_flag <= 600:
         edges.append((0, l_flag))
-    if 0 < r_flag and r_flag < 600:
+    if len(edges) < 2 and 0 < r_flag and r_flag < 600:
         edges.append((600, r_flag))
 
     return edges
 
-def get_edge_temp(a, b, mid, l_mid, direction):
+def get_edge_temp(a, b, mid, l_mid, dot, direction):
     edges = []
-    t_flag = -b // a            # y = 0
-    b_flag = (600 - b) // a     # y = 600
+    if a == 1340:
+        t_flag = b
+        b_flag = b
+    elif a != 0:
+        t_flag = -b // a            # y = 0
+        b_flag = (600 - b) // a     # y = 600
+    else:
+        t_flag = -1
+        b_flag = -1
     l_flag = b                  # x = 0
     r_flag = 600 * a + b        # x = 600
 
+    print('flags', t_flag, b_flag, l_flag, r_flag)
+
     if 0 <= t_flag and t_flag <= 600:
         edges.append((t_flag, 0))
-    if 0 < b_flag and b_flag < 600:
+    if 0 <= b_flag and b_flag <= 600:
         edges.append((b_flag, 600))
-    if 0 <= l_flag and l_flag <= 600:
+    if len(edges) < 2 and 0 < l_flag and l_flag < 600:
         edges.append((0, l_flag))
-    if 0 < r_flag and r_flag < 600:
+    if len(edges) < 2 and 0 < r_flag and r_flag < 600:
         edges.append((600, r_flag))
 
+    print(edges)
+
     calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
-    if calc_len(edges[0], l_mid) >= calc_len(edges[0], mid):
+    if calc_len(edges[0], l_mid) == calc_len(edges[0], mid): # 直角
+        print('直')
+        print(a, b, dot)
+        if calc_len(edges[0], dot) > calc_len(edges[0], mid):
+            out_i = 0
+            in_i = 1
+        else:
+            out_i = 1
+            in_i = 0
+    elif calc_len(edges[0], l_mid) > calc_len(edges[0], mid):
         out_i = 0
         in_i = 1
     else:
