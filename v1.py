@@ -149,22 +149,24 @@ class App(QtWidgets.QWidget):
     def load_result(self):
         self.clear()
         f_name = helper.select_file(self)
-        p_data, e_data = helper.from_result(f_name)
+        if f_name:
+            p_data, e_data = helper.from_result(f_name)
 
-        for p in p_data:
-            self.canvas.draw_point(*p)
-        # for e in e_data:
-        #     self.canvas.draw_edge(*e)
-        self.canvas.draw_edges(e_data)
+            for p in p_data:
+                self.canvas.draw_point(*p)
+            # for e in e_data:
+            #     self.canvas.draw_edge(*e)
+            self.canvas.draw_edges(e_data)
 
     def load(self):
         f_name = helper.select_file(self)
-        data = helper.from_text(f_name)
-        self.data = data
-        self.data_i = 0
-        self.data_input.setText(str(self.data_i))
+        if f_name:
+            data = helper.from_text(f_name)
+            self.data = data
+            self.data_i = 0
+            self.data_input.setText(str(self.data_i))
 
-        self.draw_data()
+            self.draw_data()
 
     def draw_data(self):
         self.clear()
@@ -179,9 +181,16 @@ class App(QtWidgets.QWidget):
             self.canvas.draw_point(d[0], d[1])
         self.canvas.update()
 
-        data = sorted(self.canvas.data, key=lambda x: (x[0], x[1]))
+        data = self.canvas.data
+        data = list(set(data))
+        data = sorted(data, key=lambda x: (x[0], x[1]))
         self.canvas.data = data
-        edges = self.voronoi_temp(data)
+
+        try:
+            edges = self.voronoi_temp(data)
+        except Exception as e:
+            print(e)
+            edges = []
         self.edges = edges
 
         # print(len(edges), 'edges')
@@ -194,7 +203,9 @@ class App(QtWidgets.QWidget):
         data = ''
         data += '\n'.join(['P {} {}'.format(d[0], d[1]) for d in self.canvas.data]) + '\n'
         print(self.edges)
-        data += '\n'.join(['E {} {} {} {}'.format(int(d[0][0]), int(d[0][1]), int(d[1][0]), int(d[1][1])) for d in self.edges]) + '\n'
+
+        edges = sorted(self.edges, key=lambda x:(x[0][0], x[0][1], x[1][0], x[1][1]))
+        data += '\n'.join(['E {} {} {} {}'.format(int(d[0][0]), int(d[0][1]), int(d[1][0]), int(d[1][1])) for d in edges]) + '\n'
 
         os.makedirs('output', exist_ok=True)
 
@@ -223,15 +234,7 @@ class App(QtWidgets.QWidget):
         return lines
 
     def voronoi_temp(self, points):
-        del_i = -1
-        for i, p1 in enumerate(points):
-            for j, p2 in enumerate(points):
-                if i == j:
-                    continue
-                if p1 == p2:
-                    del_i = i
-        if del_i != -1:
-            points.pop(del_i)
+        print('points', points)
 
         if len(points) == 1:
             return []
@@ -251,11 +254,23 @@ class App(QtWidgets.QWidget):
 
             # calc mid
             if funcs[0][0] == funcs[1][0]: # 平行
+                print('funcs', funcs)
                 edges = [get_edge(points[0], points[1]), get_edge(points[1], points[2])]
+                print('three edge', edges)
             else:
-                mid_x = (funcs[1][1] - funcs[0][1]) / (funcs[0][0] - funcs[1][0])
-                mid_y = mid_x * funcs[0][0] + funcs[0][1]
-                mid = (mid_x, mid_y)
+                print(funcs[0][0], funcs[0][1], funcs[1][0], funcs[1][1])
+                if funcs[0][0] == None: # vertical
+                    mid_x = funcs[0][1]
+                    mid_y = mid_x * funcs[1][0] + funcs[1][1]
+                    mid = (mid_x, mid_y)
+                elif funcs[1][0] == None:
+                    mid_x = funcs[1][1]
+                    mid_y = mid_x * funcs[0][0] + funcs[0][1]
+                    mid = (mid_x, mid_y)
+                else:
+                    mid_x = (funcs[1][1] - funcs[0][1]) / (funcs[0][0] - funcs[1][0])
+                    mid_y = mid_x * funcs[0][0] + funcs[0][1]
+                    mid = (mid_x, mid_y)
 
                 calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
                 directions = ['out', 'out', 'out']
@@ -263,7 +278,24 @@ class App(QtWidgets.QWidget):
                     longest = max([f[3] for f in funcs])
                     longest_i = [f[3] for f in funcs].index(longest)
                     directions[longest_i] = 'in'
-                # print(directions)
+                # if mid[0] < 0 or mid[0] > 600 or mid[1] < 0 or mid[1] > 600:
+                #     if longest_i == 0:
+                #         i1 = 1
+                #         i2 = 2
+                #     elif longest_i == 1:
+                #         i1 = 0
+                #         i2 = 2
+                #     elif longest_i == 2:
+                #         i1 = 0
+                #         i2 = 1
+                #
+                #     if funcs[i1][0] > funcs[i2][0]:
+                #         out_i = i1
+                #     else:
+                #         out_i = i2
+                #
+                #     directions[out_i] = 'in'
+                print(directions)
 
                 dots = [points[2], points[0], points[1]]
                 edges = [get_edge_temp(f[0], f[1], mid, f[2], dots[i], directions[i]) for i, f in enumerate(funcs)]
@@ -274,7 +306,7 @@ class App(QtWidgets.QWidget):
             return []
 
 def get_func(p1, p2):
-    calc_mid = lambda p1, p2: ((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)
+    calc_mid = lambda p1, p2: ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
     calc_slope = lambda p1, p2: (p2[1] - p1[1]) / (p2[0] - p1[0])
     x, y = calc_mid(p1, p2)
     l_mid = (x, y)
@@ -282,7 +314,8 @@ def get_func(p1, p2):
         a = 0
         b = y - a * x
     elif p1[1] == p2[1]:
-        a = 1340
+        print('p1p2', p1, p2)
+        a = None
         b = (p1[0] + p2[0]) / 2
     else:
         a = -1 / calc_slope(p1, p2)
@@ -302,17 +335,22 @@ def get_edge(p1, p2, a=None, b=None):
 
     # get points on edge
     edges = []
-    if a == 1340:
+    if a == None:
         t_flag = b
         b_flag = b
-    elif a != 0:
-        t_flag = -b // a            # y = 0
-        b_flag = (600 - b) // a     # y = 600
+        l_flag = -1
+        r_flag = -1
     else:
-        t_flag = -1
-        b_flag = -1
-    l_flag = b                  # x = 0
-    r_flag = 600 * a + b        # x = 600
+        if a != 0:
+            t_flag = -b // a            # y = 0
+            b_flag = (600 - b) // a     # y = 600
+        else:
+            t_flag = -1
+            b_flag = -1
+        l_flag = b                  # x = 0
+        r_flag = 600 * a + b        # x = 600
+
+    print(a, b, t_flag)
 
     if len(edges) < 2 and 0 <= t_flag and t_flag <= 600:
         edges.append((t_flag, 0))
@@ -327,17 +365,23 @@ def get_edge(p1, p2, a=None, b=None):
 
 def get_edge_temp(a, b, mid, l_mid, dot, direction):
     edges = []
-    if a == 1340:
+    if a == None:
         t_flag = b
         b_flag = b
-    elif a != 0:
-        t_flag = -b // a            # y = 0
-        b_flag = (600 - b) // a     # y = 600
+        l_flag = -1
+        r_flag = -1
     else:
-        t_flag = -1
-        b_flag = -1
-    l_flag = b                  # x = 0
-    r_flag = 600 * a + b        # x = 600
+        if a != 0:
+            t_flag = -b // a            # y = 0
+            b_flag = (600 - b) // a     # y = 600
+        else:
+            t_flag = -1
+            b_flag = -1
+        l_flag = b                  # x = 0
+        r_flag = 600 * a + b        # x = 600
+
+    print('flags', t_flag, b_flag)
+    print('flags2', l_flag, r_flag)
 
     if 0 <= t_flag and t_flag <= 600:
         edges.append((t_flag, 0))
@@ -348,8 +392,6 @@ def get_edge_temp(a, b, mid, l_mid, dot, direction):
     if len(edges) < 2 and 0 < r_flag and r_flag < 600:
         edges.append((600, r_flag))
 
-    print(a, b)
-
     calc_len = lambda p1, p2: ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) ** 0.5
     if calc_len(edges[0], l_mid) == calc_len(edges[0], mid): # 直角
         if calc_len(edges[0], dot) > calc_len(edges[0], mid):
@@ -358,15 +400,36 @@ def get_edge_temp(a, b, mid, l_mid, dot, direction):
         else:
             out_i = 1
             in_i = 0
-    elif calc_len(edges[0], l_mid) > calc_len(edges[0], mid):
-        out_i = 0
-        in_i = 1
     else:
-        out_i = 1
-        in_i = 0
+        print('mid', mid)
+        # print('edge', calc_len(edges[0], l_mid), calc_len(edges[0], mid))
+        if mid[0] >= 0 and mid[0] <= 600 and mid[1] >= 0 and mid[1] <= 600:
+            if calc_len(edges[0], l_mid) > calc_len(edges[0], mid):
+                out_i = 0
+                in_i = 1
+            else:
+                out_i = 1
+                in_i = 0
+        else:
+            print('dir', direction)
+            if direction == 'in':
+                if mid[0] > l_mid[0]:
+                    out_i = 1
+                    in_i = 0
+                else:
+                    out_i = 0
+                    in_i = 1
+            else:
+                out_i = 0
+                in_i = 1
+
+            # return [(0,0),(0,0)]
 
     if direction == 'out':
-        edges[out_i] = mid
+        if mid[0] < 0 or mid[0] > 600 or mid[1] < 0 or mid[1] > 600:
+            pass
+        else:
+            edges[out_i] = mid
     else:
         edges[in_i] = mid
 

@@ -1,16 +1,35 @@
 from PyQt5.QtWidgets import QFileDialog
 
 def from_text(f_name):
+    print('f_name', f_name)
     with open(f_name, encoding='utf-8') as f:
         raw_data = f.readlines()
-        raw_data = [l[:-1] for l in raw_data
+        print('raw_lines', raw_data[:100])
+        raw_data = [l.replace('\n', '') for l in raw_data
                     if l[0] not in ('#', '\n')]
+        print('raw2', raw_data[:10])
     data = []
     i = 0
     while i < len(raw_data) and raw_data[i] != '0':
-        l = int(raw_data[i])
+        try:
+            l = int(raw_data[i])
+        except:
+            print('e1', raw_data[i])
+            break
+        if l == 0:
+            break
+        # try:
+        #     l = int(raw_data[i])
+        # except:
+        #     print('err1')
+        #     print(raw_data[i - 3:i + 3])
+        #     break
         i += 1
-        data.append([l] + [[int(s_str) for s_str in s.split(' ')] for s in raw_data[i:i + l]])
+        try:
+            data.append([l] + [tuple([int(s_str) for s_str in s.split(' ')]) for s in raw_data[i:i + l]])
+        except:
+            print('e2', raw_data[i:i + l])
+            break
         i += l
     return data
 
