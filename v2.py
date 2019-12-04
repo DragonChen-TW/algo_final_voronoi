@@ -3,6 +3,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 #
 import helper
+import convex_hull
 
 class Canvas(QtWidgets.QLabel):
     def __init__(self):
@@ -32,7 +33,7 @@ class Canvas(QtWidgets.QLabel):
 
     def draw_line(self, x1, y1, x2, y2):
         if self.mode == 1:
-            self.mode = 2
+            # self.mode = 2
             p = self.painter.pen()
             p.setWidth(4)
             self.painter.setPen(p)
@@ -52,11 +53,17 @@ class Canvas(QtWidgets.QLabel):
         p.setWidth(2)
         p.setColor(Qt.red)
         self.painter.setPen(p)
-        for edge in edges:
-            if len(edge) == 2:
-                self.draw_edge(*edge[0], *edge[1])
-            else:
-                self.draw_edge(*edge)
+
+        if isinstance(edges[0], convex_hull.Point):
+            for (i, e) in enumerate(edges[:-1]):
+                self.draw_edge(e.x, e.y,
+                        edges[i + 1].x, edges[i + 1].y)
+        else:
+            for edge in edges:
+                if len(edge) == 2:
+                    self.draw_edge(*edge[0], *edge[1])
+                else:
+                    self.draw_edge(*edge)
 
         # back
         p.setWidth(10)
@@ -107,6 +114,10 @@ class App(QtWidgets.QWidget):
         clear.setText('Clear')
         clear.clicked.connect(self.clear)
 
+        convex = QtWidgets.QPushButton()
+        convex.setText('Convex Hull')
+        convex.clicked.connect(self.show_convex)
+
         btns = QtWidgets.QHBoxLayout()
         btns.addWidget(load)
         btns.addWidget(load_result)
@@ -119,11 +130,15 @@ class App(QtWidgets.QWidget):
         btns2.addWidget(save)
         btns2.addWidget(clear)
 
+        btns3 = QtWidgets.QHBoxLayout()
+        btns3.addWidget(convex)
+
         # VBox Layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.canvas)
         layout.addLayout(btns)
         layout.addLayout(btns2)
+        layout.addLayout(btns3)
         self.setLayout(layout)
 
     def data_input_change(self):
@@ -175,11 +190,14 @@ class App(QtWidgets.QWidget):
             self.canvas.data.append(p)
         self.run()
 
-    def run(self):
+    def canvas_clear(self):
         self.canvas.pixmap().fill(Qt.white)
         for d in self.canvas.data:
             self.canvas.draw_point(d[0], d[1])
         self.canvas.update()
+
+    def run(self):
+        self.canvas_clear()
 
         data = self.canvas.data
         data = list(set(data))
@@ -216,6 +234,23 @@ class App(QtWidgets.QWidget):
         self.canvas.pixmap().fill(Qt.white)
         self.canvas.update()
         self.canvas.data = []
+
+    def show_convex(self, data=None):
+        self.canvas_clear()
+
+        if not data:
+            data = self.canvas.data
+
+        print('data', len(data))
+
+        ch = convex_hull.ConvexHull(points=[
+            convex_hull.Point(p[0], p[1]) for p in data
+        ])
+        ch.run()
+
+        cv_points = ch.cv_points
+        print(cv_points)
+        self.canvas.draw_edges(cv_points)
 
     def voronoi(self, points):
         if len(points) == 1:
