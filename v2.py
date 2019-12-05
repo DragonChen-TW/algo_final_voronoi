@@ -3,7 +3,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 #
 import helper
-import convex_hull
+from melkman import melkman
 
 class Canvas(QtWidgets.QLabel):
     def __init__(self):
@@ -54,10 +54,13 @@ class Canvas(QtWidgets.QLabel):
         p.setColor(Qt.red)
         self.painter.setPen(p)
 
-        if isinstance(edges[0], convex_hull.Point):
-            for (i, e) in enumerate(edges[:-1]):
-                self.draw_edge(e.x, e.y,
-                        edges[i + 1].x, edges[i + 1].y)
+        # if isinstance(edges[0], cv_help.Point):
+        #     for (i, e) in enumerate(edges[:-1]):
+        #         self.draw_edge(e.x, e.y,
+        #                 edges[i + 1].x, edges[i + 1].y)
+        if edges and edges[0] == edges[-1]: # from convex hull
+            for (i, edge) in enumerate(edges[:-1]):
+                self.draw_edge(*edge, *edges[i + 1])
         else:
             for edge in edges:
                 if len(edge) == 2:
@@ -81,6 +84,23 @@ class App(QtWidgets.QWidget):
 
         self.data = []
         self.data_i = 0
+
+        # cv_only = True
+        # def cv_generate(queue, points):
+        #     if len(points) == 2:
+        #         queue.
+        #         return
+        #
+        #     queue.insert(0, points)
+        #
+        #     l = len(points) // 2
+        #     l_points = points[:l]
+        #     r_points = points[l:]
+        #
+        #
+        # if cv_only:
+        #     self.cv_queue = []
+
 
     def _initUI(self):
         self.canvas = Canvas()
@@ -115,8 +135,11 @@ class App(QtWidgets.QWidget):
         clear.clicked.connect(self.clear)
 
         convex = QtWidgets.QPushButton()
-        convex.setText('Convex Hull')
-        convex.clicked.connect(self.show_convex)
+        convex.setText('Convex Hull One')
+        convex.clicked.connect(self.show_convex_one)
+        cv_step = QtWidgets.QPushButton()
+        cv_step.setText('CV Step')
+        cv_step.clicked.connect(self.show_convex)
 
         btns = QtWidgets.QHBoxLayout()
         btns.addWidget(load)
@@ -132,6 +155,7 @@ class App(QtWidgets.QWidget):
 
         btns3 = QtWidgets.QHBoxLayout()
         btns3.addWidget(convex)
+        btns3.addWidget(cv_step)
 
         # VBox Layout
         layout = QtWidgets.QVBoxLayout()
@@ -205,7 +229,8 @@ class App(QtWidgets.QWidget):
         self.canvas.data = data
 
         try:
-            edges = self.voronoi_temp(data)
+            # edges = self.voronoi_temp(data)
+            edges = self.voronoi(data)
         except Exception as e:
             print(e)
             edges = []
@@ -235,21 +260,34 @@ class App(QtWidgets.QWidget):
         self.canvas.update()
         self.canvas.data = []
 
+    def show_convex_one(self, data=None):
+        self.canvas_clear()
+
+        if not data:
+            data = self.canvas.data
+            data = sorted(data, key=lambda x: (x[0], x[1]))
+
+        # print('data', len(data))
+        # print(data)
+
+        cv_points = melkman(data)
+
+        self.canvas.draw_edges(cv_points)
+
     def show_convex(self, data=None):
         self.canvas_clear()
 
         if not data:
             data = self.canvas.data
+            data = sorted(data, key=lambda x: (x[0], x[1]))
 
         print('data', len(data))
+        print(data)
 
-        ch = convex_hull.ConvexHull(points=[
-            convex_hull.Point(p[0], p[1]) for p in data
-        ])
-        ch.run()
+        cv_points = melkman(data)
 
-        cv_points = ch.cv_points
         print(cv_points)
+
         self.canvas.draw_edges(cv_points)
 
     def voronoi(self, points):
